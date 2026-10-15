@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../features/bookings/presentation/screens/bookings_screen.dart';
 import '../features/explore/presentation/screens/explore_screen.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/navigation/presentation/main_navigation_shell.dart';
@@ -37,7 +38,17 @@ final appRouter = GoRouter(
           ],
         ),
 
-        // Tab 2: Orders
+        // Tab 2: Bookings
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/bookings',
+              builder: (context, state) => const BookingsScreen(),
+            ),
+          ],
+        ),
+
+        // Tab 3: Orders
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -47,7 +58,7 @@ final appRouter = GoRouter(
           ],
         ),
 
-        // Tab 3: Account
+        // Tab 4: Account
         StatefulShellBranch(
           routes: [
             GoRoute(
