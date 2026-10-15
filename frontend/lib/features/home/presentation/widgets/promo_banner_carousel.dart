@@ -42,11 +42,7 @@ class _PromoBannerCarouselState extends State<PromoBannerCarousel> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     image: DecorationImage(
-                      image: NetworkImage(
-                        banner.imageUrl.isNotEmpty
-                            ? banner.imageUrl
-                            : 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800',
-                      ),
+                      image: _resolveBannerImage(index, banner.imageUrl),
                       fit: BoxFit.cover,
                     ),
                     boxShadow: AppColors.elevatedShadow,
@@ -168,5 +164,18 @@ class _PromoBannerCarouselState extends State<PromoBannerCarousel> {
         ],
       ],
     );
+  }
+
+  ImageProvider _resolveBannerImage(int index, String imageUrl) {
+    if (index == 0 || imageUrl == 'assets/images/h.jpg' || imageUrl == 'h.jpg') {
+      return const AssetImage('assets/images/h.jpg');
+    }
+    if (imageUrl.startsWith('assets/')) {
+      return AssetImage(imageUrl);
+    }
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return NetworkImage(imageUrl);
+    }
+    return const AssetImage('assets/images/h.jpg');
   }
 }

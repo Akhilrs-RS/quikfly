@@ -49,7 +49,7 @@ class ApiClient {
           title: 'Move smarter. Live easier.',
           subtitle: 'Bikes, food, shopping and multi-vendor delivery wherever you are.',
           buttonLabel: 'Explore services',
-          imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800',
+          imageUrl: 'assets/images/h.jpg',
           actionRoute: '/explore',
         ),
       ],
