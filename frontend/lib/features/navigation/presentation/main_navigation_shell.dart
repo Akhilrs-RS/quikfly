@@ -32,7 +32,7 @@ class MainNavigationShell extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(
-                  icon: Icons.home_rounded,
+                  icon: Icons.home_outlined,
                   activeIcon: Icons.home_rounded,
                   label: 'Home',
                   index: 0,
@@ -46,15 +46,16 @@ class MainNavigationShell extends StatelessWidget {
                   currentIndex: currentIndex,
                 ),
                 _buildNavItem(
-                  icon: Icons.confirmation_number_outlined,
-                  activeIcon: Icons.confirmation_number_rounded,
+                  icon: Icons.calendar_month_outlined,
+                  activeIcon: Icons.calendar_month_rounded,
                   label: 'Bookings',
                   index: 2,
                   currentIndex: currentIndex,
+                  activeColor: const Color(0xFFF95738), // Coral orange from Figma
                 ),
                 _buildNavItem(
-                  icon: Icons.receipt_long_outlined,
-                  activeIcon: Icons.receipt_long_rounded,
+                  icon: Icons.inventory_2_outlined,
+                  activeIcon: Icons.inventory_2_rounded,
                   label: 'Orders',
                   index: 3,
                   currentIndex: currentIndex,
@@ -80,8 +81,10 @@ class MainNavigationShell extends StatelessWidget {
     required String label,
     required int index,
     required int currentIndex,
+    Color? activeColor,
   }) {
     final isSelected = index == currentIndex;
+    final color = isSelected ? (activeColor ?? AppColors.primary) : AppColors.textSecondary;
 
     return GestureDetector(
       onTap: () => navigationShell.goBranch(
@@ -99,8 +102,8 @@ class MainNavigationShell extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Icon(
                 isSelected ? activeIcon : icon,
-                size: 23,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                size: 22,
+                color: color,
               ),
             ),
             const SizedBox(height: 3),
@@ -111,7 +114,7 @@ class MainNavigationShell extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                color: color,
               ),
             ),
           ],
