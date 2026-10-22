@@ -115,7 +115,7 @@ ON DUPLICATE KEY UPDATE title=VALUES(title);
 -- Banners
 INSERT INTO banners (type, tagline, title, subtitle, button_label, image_url, action_route, sort_order) VALUES
 ('hero', 'ONE APP, EVERY DAY.', 'Move smarter. Live easier.', 'Bikes, food, shopping and multi-vendor delivery wherever you are.', 'Explore services', 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800', '/explore', 1),
-('story', 'CURATED GETAWAYS', 'Breathe in the hills', 'Curated weekend escapes from Bengaluru.', 'Explore trips', 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800', '/trips/hills', 2),
+('story', 'CURATED GETAWAYS', 'Breathe in the hills', 'Curated weekend escapes from Bengaluru.', 'Explore trips', 'assets/images/ex.jpg', '/trips/hills', 2),
 ('safety', NULL, 'Your safety comes first', '24/7 support & emergency buddy services', NULL, '', '/safety', 3);
 
 -- Popular Merchants

@@ -277,11 +277,7 @@ class ExploreScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
                         image: DecorationImage(
-                          image: NetworkImage(
-                            feed.weekendInspiration!.imageUrl.isNotEmpty
-                                ? feed.weekendInspiration!.imageUrl
-                                : 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800',
-                          ),
+                          image: _resolveExploreImage(feed.weekendInspiration?.imageUrl),
                           fit: BoxFit.cover,
                         ),
                         boxShadow: AppColors.elevatedShadow,
@@ -440,6 +436,23 @@ class ExploreScreen extends ConsumerWidget {
       default:
         return const _ServiceStyle(Icons.storefront_rounded, Color(0xFFEE46BC), Color(0xFFFCE7F6));
     }
+  }
+
+  ImageProvider _resolveExploreImage(String? imageUrl) {
+    if (imageUrl == null ||
+        imageUrl.isEmpty ||
+        imageUrl == 'assets/images/ex.jpg' ||
+        imageUrl == 'ex.jpg' ||
+        imageUrl.contains('photo-1506744038136')) {
+      return const AssetImage('assets/images/ex.jpg');
+    }
+    if (imageUrl.startsWith('assets/')) {
+      return AssetImage(imageUrl);
+    }
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return NetworkImage(imageUrl);
+    }
+    return const AssetImage('assets/images/ex.jpg');
   }
 }
 

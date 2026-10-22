@@ -280,7 +280,7 @@ class DatabaseService {
       title: 'Breathe in the hills',
       subtitle: 'Curated weekend escapes from Bengaluru.',
       buttonLabel: 'Explore trips',
-      imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800',
+      imageUrl: 'assets/images/ex.jpg',
       actionRoute: '/explore',
       sortOrder: 2,
     ),
