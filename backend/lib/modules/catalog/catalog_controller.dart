@@ -407,6 +407,105 @@ class CatalogController {
       }
     });
 
+    // GET /api/v1/addresses
+    router.get('/addresses', (Request request) async {
+      try {
+        final db = DatabaseService.instance;
+        final list = await db.getAddresses();
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': list.map((a) => a.toJson()).toList(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/addresses
+    router.post('/addresses', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final address = await db.createAddress(
+          label: json['label'] as String? ?? 'Home',
+          addressLine: json['address_line'] as String? ?? '',
+          locality: json['locality'] as String? ?? 'Indiranagar',
+          city: json['city'] as String? ?? 'Bengaluru',
+          latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+          longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+          isDefault: json['is_default'] == true || json['is_default'] == 1 || json['is_default'] == '1',
+        );
+
+        return Response(
+          201,
+          body: jsonEncode({
+            'status': 'success',
+            'data': address.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // PUT /api/v1/addresses/<id>/default
+    router.put('/addresses/<id>/default', (Request request, String id) async {
+      try {
+        final addressId = int.tryParse(id) ?? 0;
+        final db = DatabaseService.instance;
+        final success = await db.setDefaultAddress(addressId);
+        return Response.ok(
+          jsonEncode({
+            'status': success ? 'success' : 'failed',
+            'message': success ? 'Address set as default' : 'Could not set default address',
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // DELETE /api/v1/addresses/<id>
+    router.delete('/addresses/<id>', (Request request, String id) async {
+      try {
+        final addressId = int.tryParse(id) ?? 0;
+        final db = DatabaseService.instance;
+        final success = await db.deleteAddress(addressId);
+        return Response.ok(
+          jsonEncode({
+            'status': success ? 'success' : 'failed',
+            'message': success ? 'Address deleted' : 'Could not delete address',
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
     return router;
   }
 }

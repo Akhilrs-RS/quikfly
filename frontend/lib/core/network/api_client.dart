@@ -26,6 +26,11 @@ final preferencesProvider = FutureProvider.autoDispose<UserPreferences>((ref) as
   return client.fetchPreferences();
 });
 
+final addressesProvider = FutureProvider.autoDispose<List<AddressItem>>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  return client.fetchAddresses();
+});
+
 class ApiClient {
   final Dio _dio;
 
@@ -392,6 +397,91 @@ class ApiClient {
       biometricLock: biometricLock ?? true,
       language: language ?? 'English (US)',
     );
+  }
+
+  Future<List<AddressItem>> fetchAddresses() async {
+    try {
+      final response = await _dio.get('/addresses');
+      if (response.statusCode == 200 && response.data != null) {
+        final list = response.data['data'] as List;
+        return list.map((a) => AddressItem.fromJson(a as Map<String, dynamic>)).toList();
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /addresses failed ($e). Using local fallback.');
+    }
+    return [
+      const AddressItem(
+        id: 1,
+        userId: 1,
+        label: 'Home',
+        addressLine: '100ft Road, Indiranagar',
+        locality: 'Indiranagar',
+        city: 'Bengaluru',
+        latitude: 12.9784,
+        longitude: 77.6408,
+        isDefault: true,
+      ),
+    ];
+  }
+
+  Future<AddressItem> addCustomAddress({
+    required String label,
+    required String addressLine,
+    required String locality,
+    String city = 'Bengaluru',
+    double? latitude,
+    double? longitude,
+    bool isDefault = true,
+  }) async {
+    try {
+      final response = await _dio.post('/addresses', data: {
+        'label': label,
+        'address_line': addressLine,
+        'locality': locality,
+        'city': city,
+        'latitude': latitude,
+        'longitude': longitude,
+        'is_default': isDefault,
+      });
+      if (response.statusCode == 201 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return AddressItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /addresses POST failed ($e).');
+    }
+
+    return AddressItem(
+      id: DateTime.now().millisecondsSinceEpoch % 10000,
+      userId: 1,
+      label: label,
+      addressLine: addressLine,
+      locality: locality,
+      city: city,
+      latitude: latitude ?? 12.9716,
+      longitude: longitude ?? 77.6412,
+      isDefault: isDefault,
+    );
+  }
+
+  Future<bool> setDefaultAddress(int addressId) async {
+    try {
+      final response = await _dio.put('/addresses/$addressId/default');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('⚠️ API Client notice: Live /addresses/$addressId/default PUT failed ($e).');
+      return false;
+    }
+  }
+
+  Future<bool> deleteAddress(int addressId) async {
+    try {
+      final response = await _dio.delete('/addresses/$addressId');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('⚠️ API Client notice: Live /addresses/$addressId DELETE failed ($e).');
+      return false;
+    }
   }
 
   static final List<OrderItem> _defaultOrders = [

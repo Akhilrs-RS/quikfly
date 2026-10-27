@@ -56,6 +56,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   _buildDivider(),
                   _buildMenuItem(
+                    icon: Icons.location_on_outlined,
+                    title: 'Saved addresses',
+                    onTap: () => _showSavedAddressesSheet(context),
+                  ),
+                  _buildDivider(),
+                  _buildMenuItem(
                     icon: Icons.favorite_outline_rounded,
                     title: 'Saved items',
                     onTap: () => _showSavedItemsSheet(context),
@@ -526,6 +532,393 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: const Text('Save Profile Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSavedAddressesSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final addressesAsync = ref.watch(addressesProvider);
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Saved Addresses (MySQL)',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _showAddAddressSheet(context);
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Manage your delivery destinations and custom locations:',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: addressesAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                  error: (e, s) => Center(child: Text('Error: $e')),
+                  data: (addresses) {
+                    if (addresses.isEmpty) {
+                      return const Center(child: Text('No saved addresses yet.'));
+                    }
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: addresses.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final addr = addresses[index];
+                        final icon = addr.label.toLowerCase() == 'work'
+                            ? Icons.work_outline_rounded
+                            : addr.label.toLowerCase() == 'gym'
+                                ? Icons.fitness_center_rounded
+                                : Icons.home_outlined;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: addr.isDefault ? const Color(0xFFF0F5FF) : AppColors.background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: addr.isDefault ? AppColors.primary : AppColors.border,
+                              width: addr.isDefault ? 1.5 : 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: addr.isDefault ? AppColors.primary : AppColors.surface,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                icon,
+                                color: addr.isDefault ? Colors.white : AppColors.primary,
+                                size: 20,
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  addr.formattedTitle,
+                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    addr.label.toUpperCase(),
+                                    style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Text(
+                              addr.addressLine,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded, color: AppColors.textMuted, size: 20),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dCtx) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Text('Delete Address?'),
+                                    content: Text('Are you sure you want to delete ${addr.formattedTitle} from MySQL?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(dCtx, true),
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentRed),
+                                        child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await ref.read(apiClientProvider).deleteAddress(addr.id);
+                                  ref.invalidate(addressesProvider);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(this.context).showSnackBar(
+                                    SnackBar(content: Text('Deleted ${addr.formattedTitle} from MySQL.')),
+                                  );
+                                }
+                              },
+                            ),
+                            onTap: () async {
+                              await ref.read(apiClientProvider).setDefaultAddress(addr.id);
+                              await ref.read(apiClientProvider).updateUserProfile(
+                                    fullName: 'Arjun Kumar',
+                                    phone: '+919876548219',
+                                    email: 'arjun.kumar@quikfly.app',
+                                    activeLocality: addr.locality,
+                                  );
+                              ref.invalidate(addressesProvider);
+                              ref.invalidate(userProfileProvider);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${addr.formattedTitle} set as active delivery location!'),
+                                  backgroundColor: AppColors.accentGreen,
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  _showAddAddressSheet(context);
+                },
+                icon: const Icon(Icons.add_location_alt_outlined, color: Colors.white),
+                label: const Text('Add New Custom Location', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddAddressSheet(BuildContext context) {
+    String selectedLabel = 'Home';
+    final addressLineController = TextEditingController();
+    final localityController = TextEditingController();
+    final cityController = TextEditingController(text: 'Bengaluru');
+    bool setAsDefault = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (formCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(formCtx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add Custom Location',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Store address directly into MySQL database:',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+
+                // Label selector pills
+                const Text('Address Label:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  children: ['Home', 'Work', 'Gym', 'Custom'].map((lbl) {
+                    final isSel = selectedLabel == lbl;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(
+                          lbl,
+                          style: TextStyle(
+                            color: isSel ? Colors.white : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        selected: isSel,
+                        selectedColor: AppColors.primary,
+                        backgroundColor: AppColors.background,
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedLabel = lbl);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 14),
+
+                TextField(
+                  controller: addressLineController,
+                  decoration: const InputDecoration(
+                    labelText: 'House / Street / Landmark',
+                    hintText: 'e.g. #42, 5th Main, 9th Cross',
+                    prefixIcon: Icon(Icons.home_work_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: localityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Locality / Area',
+                    hintText: 'e.g. Jayanagar, Electronic City, Bellandur',
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(
+                    labelText: 'City',
+                    prefixIcon: Icon(Icons.map_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Set as current active delivery location', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  value: setAsDefault,
+                  activeColor: AppColors.primary,
+                  onChanged: (val) {
+                    setModalState(() => setAsDefault = val);
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                ElevatedButton(
+                  onPressed: () async {
+                    final street = addressLineController.text.trim();
+                    final area = localityController.text.trim();
+                    final city = cityController.text.trim();
+
+                    if (street.isEmpty || area.isEmpty) {
+                      ScaffoldMessenger.of(formCtx).showSnackBar(
+                        const SnackBar(content: Text('Please enter both street and locality.')),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(formCtx);
+
+                    try {
+                      final newAddr = await ref.read(apiClientProvider).addCustomAddress(
+                            label: selectedLabel,
+                            addressLine: street,
+                            locality: area,
+                            city: city.isEmpty ? 'Bengaluru' : city,
+                            isDefault: setAsDefault,
+                          );
+
+                      if (setAsDefault) {
+                        await ref.read(apiClientProvider).updateUserProfile(
+                              fullName: 'Arjun Kumar',
+                              phone: '+919876548219',
+                              email: 'arjun.kumar@quikfly.app',
+                              activeLocality: newAddr.locality,
+                            );
+                      }
+
+                      ref.invalidate(addressesProvider);
+                      ref.invalidate(userProfileProvider);
+
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text("Custom location '${newAddr.formattedTitle}' saved to MySQL!"),
+                          backgroundColor: AppColors.accentGreen,
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('Error adding location: $e')),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Save Location to MySQL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -528,6 +528,136 @@ class DatabaseService {
     return updated;
   }
 
+  Future<List<AddressItem>> getAddresses({int userId = 1}) async {
+    if (_isConnected && _pool != null) {
+      try {
+        final results = await _pool!.execute(
+          'SELECT * FROM addresses WHERE user_id = :userId ORDER BY is_default DESC, id DESC;',
+          {'userId': userId},
+        );
+        final list = <AddressItem>[];
+        for (final row in results.rows) {
+          list.add(AddressItem.fromJson(row.assoc()));
+        }
+        if (list.isNotEmpty) return list;
+      } catch (e) {
+        print('Error querying addresses from MySQL: $e');
+      }
+    }
+    return [
+      const AddressItem(
+        id: 1,
+        userId: 1,
+        label: 'Home',
+        addressLine: '100ft Road, Indiranagar',
+        locality: 'Indiranagar',
+        city: 'Bengaluru',
+        latitude: 12.9784,
+        longitude: 77.6408,
+        isDefault: true,
+      ),
+    ];
+  }
+
+  Future<AddressItem> createAddress({
+    int userId = 1,
+    required String label,
+    required String addressLine,
+    required String locality,
+    String city = 'Bengaluru',
+    double? latitude,
+    double? longitude,
+    bool isDefault = true,
+  }) async {
+    final lat = latitude ?? 12.9716;
+    final lng = longitude ?? 77.6412;
+
+    if (_isConnected && _pool != null) {
+      try {
+        if (isDefault) {
+          await _pool!.execute(
+            'UPDATE addresses SET is_default = FALSE WHERE user_id = :userId;',
+            {'userId': userId},
+          );
+        }
+        final insertResult = await _pool!.execute(
+          'INSERT INTO addresses (user_id, label, address_line, city, locality, latitude, longitude, is_default) '
+          'VALUES (:userId, :label, :addressLine, :city, :locality, :lat, :lng, :isDefault);',
+          {
+            'userId': userId,
+            'label': label,
+            'addressLine': addressLine,
+            'city': city,
+            'locality': locality,
+            'lat': lat,
+            'lng': lng,
+            'isDefault': isDefault ? 1 : 0,
+          },
+        );
+        final insertedId = insertResult.lastInsertID.toInt();
+        return AddressItem(
+          id: insertedId,
+          userId: userId,
+          label: label,
+          addressLine: addressLine,
+          locality: locality,
+          city: city,
+          latitude: lat,
+          longitude: lng,
+          isDefault: isDefault,
+        );
+      } catch (e) {
+        print('Error inserting address into MySQL: $e');
+      }
+    }
+
+    return AddressItem(
+      id: DateTime.now().millisecondsSinceEpoch % 10000,
+      userId: userId,
+      label: label,
+      addressLine: addressLine,
+      locality: locality,
+      city: city,
+      latitude: lat,
+      longitude: lng,
+      isDefault: isDefault,
+    );
+  }
+
+  Future<bool> setDefaultAddress(int addressId, {int userId = 1}) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'UPDATE addresses SET is_default = FALSE WHERE user_id = :userId;',
+          {'userId': userId},
+        );
+        await _pool!.execute(
+          'UPDATE addresses SET is_default = TRUE WHERE id = :id AND user_id = :userId;',
+          {'id': addressId, 'userId': userId},
+        );
+        return true;
+      } catch (e) {
+        print('Error setting default address in MySQL: $e');
+      }
+    }
+    return false;
+  }
+
+  Future<bool> deleteAddress(int addressId, {int userId = 1}) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'DELETE FROM addresses WHERE id = :id AND user_id = :userId;',
+          {'id': addressId, 'userId': userId},
+        );
+        return true;
+      } catch (e) {
+        print('Error deleting address from MySQL: $e');
+      }
+    }
+    return false;
+  }
+
   static final List<OrderItem> _mockOrders = [
     const OrderItem(
       id: 1,

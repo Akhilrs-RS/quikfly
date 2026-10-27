@@ -458,7 +458,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showLocationPicker(BuildContext context) {
-    final localities = [
+    final addressesAsync = ref.read(addressesProvider);
+    final savedAddresses = addressesAsync.value ?? [
+      const AddressItem(
+        id: 1,
+        userId: 1,
+        label: 'Home',
+        addressLine: '100ft Road, Indiranagar',
+        locality: 'Indiranagar',
+        city: 'Bengaluru',
+        latitude: 12.9784,
+        longitude: 77.6408,
+        isDefault: true,
+      ),
+    ];
+    final currentLocation = ref.read(selectedLocationProvider);
+
+    final popularLocalities = [
       {'name': 'Indiranagar, Bengaluru', 'sub': '100ft Road, Defence Colony'},
       {'name': 'Koramangala, Bengaluru', 'sub': '80ft Road, 4th Block'},
       {'name': 'Whitefield, Bengaluru', 'sub': 'ITPB Main Road, Palm Meadows'},
@@ -468,45 +484,419 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
+      builder: (pickerCtx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(pickerCtx).size.height * 0.85,
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Choose delivery location',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Delivery Location',
+                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(pickerCtx);
+                      _showAddCustomLocationSheet(context);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.add_location_alt_rounded, size: 16, color: AppColors.primary),
+                          SizedBox(width: 4),
+                          Text(
+                            '+ Add Custom',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Select a saved address or add your custom destination:',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+
+              // Saved Addresses Section (from MySQL)
+              const Text(
+                'SAVED ADDRESSES (MYSQL)',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 8),
+              ...savedAddresses.map((addr) {
+                final isSelected = currentLocation.toLowerCase().contains(addr.locality.toLowerCase()) || addr.isDefault;
+                final icon = addr.label.toLowerCase() == 'work'
+                    ? Icons.work_outline_rounded
+                    : addr.label.toLowerCase() == 'gym'
+                        ? Icons.fitness_center_rounded
+                        : Icons.home_outlined;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFF0F5FF) : AppColors.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.border,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: isSelected ? Colors.white : AppColors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Text(
+                          addr.formattedTitle,
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            addr.label.toUpperCase(),
+                            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                    subtitle: Text(
+                      addr.addressLine,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(pickerCtx);
+                      ref.read(selectedLocationProvider.notifier).state = addr.formattedTitle;
+                      await ref.read(apiClientProvider).setDefaultAddress(addr.id);
+                      await ref.read(apiClientProvider).updateUserProfile(
+                            fullName: 'Arjun Kumar',
+                            phone: '+919876548219',
+                            email: 'arjun.kumar@quikfly.app',
+                            activeLocality: addr.locality,
+                          );
+                      ref.invalidate(addressesProvider);
+                      ref.invalidate(userProfileProvider);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('Switched active delivery location to ${addr.formattedTitle}!'),
+                          backgroundColor: AppColors.darkCard,
+                        ),
+                      );
+                    },
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 14),
+
+              // Button to Add Custom Address
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(pickerCtx);
+                  _showAddCustomLocationSheet(context);
+                },
+                icon: const Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+                label: const Text(
+                  'Add New Custom Location',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  side: const BorderSide(color: AppColors.primary, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Popular Bengaluru Neighborhoods
+              const Text(
+                'POPULAR AREAS',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 8),
+              ...popularLocalities.map((loc) => ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.location_on_outlined, color: AppColors.textSecondary, size: 20),
+                    title: Text(loc['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    subtitle: Text(loc['sub']!, style: const TextStyle(fontSize: 11)),
+                    onTap: () async {
+                      Navigator.pop(pickerCtx);
+                      ref.read(selectedLocationProvider.notifier).state = loc['name']!;
+                      await ref.read(apiClientProvider).updateUserProfile(
+                            fullName: 'Arjun Kumar',
+                            phone: '+919876548219',
+                            email: 'arjun.kumar@quikfly.app',
+                            activeLocality: loc['name']!.split(',').first.trim(),
+                          );
+                      ref.invalidate(userProfileProvider);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('Active location set to ${loc['name']!}')),
+                      );
+                    },
+                  )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddCustomLocationSheet(BuildContext context) {
+    String selectedLabel = 'Home';
+    final addressLineController = TextEditingController();
+    final localityController = TextEditingController();
+    final cityController = TextEditingController(text: 'Bengaluru');
+    bool setAsDefault = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (formCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(formCtx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            const SizedBox(height: 4),
-            const Text('Updates address and local restaurants in real time', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 16),
-            ...localities.map((loc) => ListTile(
-              leading: const Icon(Icons.location_on_rounded, color: AppColors.primary),
-              title: Text(loc['name']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              subtitle: Text(loc['sub']!, style: const TextStyle(fontSize: 12)),
-              onTap: () async {
-                Navigator.pop(ctx);
-                ref.read(selectedLocationProvider.notifier).state = loc['name']!;
-                await ref.read(apiClientProvider).updateUserProfile(
-                  fullName: 'Arjun Kumar',
-                  phone: '+919876548219',
-                  email: 'arjun.kumar@quikfly.app',
-                  activeLocality: loc['name']!.split(',').first.trim(),
-                );
-                ref.invalidate(userProfileProvider);
-                if (!mounted) return;
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(content: Text('Active location set to ${loc['name']!}')),
-                );
-              },
-            )),
-          ],
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add Custom Location',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Save your exact house/office address directly to MySQL:',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+
+                // Label selector pills
+                const Text('Address Label:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  children: ['Home', 'Work', 'Gym', 'Custom'].map((lbl) {
+                    final isSel = selectedLabel == lbl;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(
+                          lbl,
+                          style: TextStyle(
+                            color: isSel ? Colors.white : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        selected: isSel,
+                        selectedColor: AppColors.primary,
+                        backgroundColor: AppColors.background,
+                        onSelected: (val) {
+                          if (val) setModalState(() => selectedLabel = lbl);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Street Address Field
+                TextField(
+                  controller: addressLineController,
+                  decoration: const InputDecoration(
+                    labelText: 'House / Flat / Street / Landmark',
+                    hintText: 'e.g. #304, Green Glen Layout, Outer Ring Rd',
+                    prefixIcon: Icon(Icons.home_work_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Locality Field
+                TextField(
+                  controller: localityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Locality / Area',
+                    hintText: 'e.g. Bellandur, Jayanagar, Electronic City',
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // City Field
+                TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(
+                    labelText: 'City',
+                    prefixIcon: Icon(Icons.map_outlined),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Set as Active Switch
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Set as current active delivery location', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  value: setAsDefault,
+                  activeColor: AppColors.primary,
+                  onChanged: (val) {
+                    setModalState(() => setAsDefault = val);
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Submit Button
+                ElevatedButton(
+                  onPressed: () async {
+                    final street = addressLineController.text.trim();
+                    final area = localityController.text.trim();
+                    final city = cityController.text.trim();
+
+                    if (street.isEmpty || area.isEmpty) {
+                      ScaffoldMessenger.of(formCtx).showSnackBar(
+                        const SnackBar(content: Text('Please enter both street address and locality.')),
+                      );
+                      return;
+                    }
+
+                    Navigator.pop(formCtx);
+
+                    try {
+                      final newAddr = await ref.read(apiClientProvider).addCustomAddress(
+                            label: selectedLabel,
+                            addressLine: street,
+                            locality: area,
+                            city: city.isEmpty ? 'Bengaluru' : city,
+                            isDefault: setAsDefault,
+                          );
+
+                      if (setAsDefault) {
+                        ref.read(selectedLocationProvider.notifier).state = newAddr.formattedTitle;
+                        await ref.read(apiClientProvider).updateUserProfile(
+                              fullName: 'Arjun Kumar',
+                              phone: '+919876548219',
+                              email: 'arjun.kumar@quikfly.app',
+                              activeLocality: newAddr.locality,
+                            );
+                      }
+
+                      ref.invalidate(addressesProvider);
+                      ref.invalidate(userProfileProvider);
+
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text("Custom location '${newAddr.formattedTitle}' saved to MySQL & set as active!"),
+                          backgroundColor: AppColors.accentGreen,
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('Error saving location: $e')),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text(
+                    'Save Location to MySQL',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
