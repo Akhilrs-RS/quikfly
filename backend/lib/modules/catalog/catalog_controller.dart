@@ -163,6 +163,250 @@ class CatalogController {
       }
     });
 
+    // POST /api/v1/orders (Place new order or Reorder)
+    router.post('/orders', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final newOrder = await db.createOrder(
+          vendorName: json['vendor_name'] as String? ?? 'QuikFly Merchant',
+          category: json['category'] as String? ?? 'FOOD',
+          totalAmount: double.tryParse(json['total_amount']?.toString() ?? '0') ?? 0.0,
+          itemsSummary: json['items_summary'] as String? ?? 'Standard items',
+        );
+
+        return Response(
+          201,
+          body: jsonEncode({
+            'status': 'success',
+            'data': newOrder.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/orders/<id>/cancel
+    router.post('/orders/<id>/cancel', (Request request, String id) async {
+      try {
+        final orderId = int.tryParse(id) ?? 0;
+        final db = DatabaseService.instance;
+        final updated = await db.cancelOrder(orderId);
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': updated?.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/bookings (Create bus/rental/getaway booking)
+    router.post('/bookings', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final newBooking = await db.createBooking(
+          title: json['title'] as String? ?? 'Trip Booking',
+          subtitle: json['subtitle'] as String? ?? 'Confirmed',
+          price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+          route: json['route'] as String?,
+          seatNo: json['seat_no'] as String?,
+        );
+
+        return Response(
+          201,
+          body: jsonEncode({
+            'status': 'success',
+            'data': newBooking.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/bookings/<id>/cancel
+    router.post('/bookings/<id>/cancel', (Request request, String id) async {
+      try {
+        final bookingId = int.tryParse(id) ?? 0;
+        final db = DatabaseService.instance;
+        final updated = await db.cancelBooking(bookingId);
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': updated?.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/rides/book (Quick Ride)
+    router.post('/rides/book', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final booking = await db.bookRide(
+          pickupAddress: json['pickup_address'] as String? ?? 'Indiranagar, Bengaluru',
+          dropAddress: json['drop_address'] as String? ?? 'Kempegowda Airport T1',
+          fare: double.tryParse(json['fare']?.toString() ?? '249') ?? 249.0,
+          serviceCode: json['service_code'] as String? ?? 'car_taxi',
+        );
+
+        return Response(
+          201,
+          body: jsonEncode({
+            'status': 'success',
+            'data': booking.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // PUT /api/v1/profile (Update name, phone, email, locality)
+    router.put('/profile', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final updated = await db.updateUserProfile(
+          fullName: json['full_name'] as String? ?? 'Arjun Kumar',
+          phone: json['phone'] as String? ?? '+919876548219',
+          email: json['email'] as String? ?? 'arjun.kumar@quikfly.app',
+          activeLocality: json['active_locality'] as String?,
+        );
+
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': updated.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // POST /api/v1/wallet/topup
+    router.post('/wallet/topup', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final amount = double.tryParse(json['amount']?.toString() ?? '500') ?? 500.0;
+        final db = DatabaseService.instance;
+        final newBalance = await db.topupWallet(amount);
+
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'wallet_balance': newBalance,
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // GET /api/v1/preferences
+    router.get('/preferences', (Request request) async {
+      try {
+        final db = DatabaseService.instance;
+        final prefs = await db.getUserPreferences();
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': prefs.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // PUT /api/v1/preferences
+    router.put('/preferences', (Request request) async {
+      try {
+        final body = await request.readAsString();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final db = DatabaseService.instance;
+
+        final updated = await db.updateUserPreferences(
+          pushNotifications: json['push_notifications'] as bool?,
+          promotionalAlerts: json['promotional_alerts'] as bool?,
+          biometricLock: json['biometric_lock'] as bool?,
+          language: json['language'] as String?,
+        );
+
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': updated.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
     return router;
   }
 }

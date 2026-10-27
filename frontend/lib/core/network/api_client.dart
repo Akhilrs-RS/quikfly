@@ -21,6 +21,11 @@ final userProfileProvider = FutureProvider.autoDispose<UserModel>((ref) async {
   return client.fetchUserProfile();
 });
 
+final preferencesProvider = FutureProvider.autoDispose<UserPreferences>((ref) async {
+  final client = ref.watch(apiClientProvider);
+  return client.fetchPreferences();
+});
+
 class ApiClient {
   final Dio _dio;
 
@@ -170,10 +175,226 @@ class ApiClient {
       avatarUrl: 'assets/images/user.jpg',
       activeLocality: 'Indiranagar',
       activeCity: 'Bengaluru',
+      walletBalance: 1450.00,
     );
   }
 
-  static const List<OrderItem> _defaultOrders = [
+  Future<OrderItem> createOrder({
+    required String vendorName,
+    required String category,
+    required double totalAmount,
+    required String itemsSummary,
+  }) async {
+    try {
+      final response = await _dio.post('/orders', data: {
+        'vendor_name': vendorName,
+        'category': category,
+        'total_amount': totalAmount,
+        'items_summary': itemsSummary,
+      });
+      if (response.statusCode == 201 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return OrderItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /orders POST failed ($e). Using local fallback.');
+    }
+
+    final newOrder = OrderItem(
+      id: _defaultOrders.length + 1,
+      orderNumber: 'QF-${(DateTime.now().millisecondsSinceEpoch % 1000000).toString().padLeft(6, '0')}',
+      vendorName: vendorName,
+      category: category,
+      status: 'PREPARING',
+      arrivalTimeLabel: 'Arrives in 22-26 min',
+      totalAmount: totalAmount,
+      itemsSummary: itemsSummary,
+      orderDate: 'Today',
+    );
+    _defaultOrders.insert(0, newOrder);
+    return newOrder;
+  }
+
+  Future<OrderItem?> cancelOrder(int orderId) async {
+    try {
+      final response = await _dio.post('/orders/$orderId/cancel');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return OrderItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /orders/$orderId/cancel failed ($e).');
+    }
+    return null;
+  }
+
+  Future<BookingItem> createBooking({
+    required String title,
+    required String subtitle,
+    required double price,
+    String? route,
+    String? seatNo,
+  }) async {
+    try {
+      final response = await _dio.post('/bookings', data: {
+        'title': title,
+        'subtitle': subtitle,
+        'price': price,
+        'route': route,
+        'seat_no': seatNo,
+      });
+      if (response.statusCode == 201 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return BookingItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /bookings POST failed ($e). Using local fallback.');
+    }
+
+    final newBooking = BookingItem(
+      id: _defaultBookings.length + 1,
+      bookingCode: 'BK-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}',
+      title: title,
+      subtitle: subtitle,
+      price: price,
+      route: route,
+      seatNo: seatNo,
+      status: 'CONFIRMED',
+      bookingDate: 'Today',
+    );
+    _defaultBookings.insert(0, newBooking);
+    return newBooking;
+  }
+
+  Future<BookingItem?> cancelBooking(int bookingId) async {
+    try {
+      final response = await _dio.post('/bookings/$bookingId/cancel');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return BookingItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /bookings/$bookingId/cancel failed ($e).');
+    }
+    return null;
+  }
+
+  Future<BookingItem> bookRide({
+    required String pickupAddress,
+    required String dropAddress,
+    required double fare,
+    String serviceCode = 'car_taxi',
+  }) async {
+    try {
+      final response = await _dio.post('/rides/book', data: {
+        'pickup_address': pickupAddress,
+        'drop_address': dropAddress,
+        'fare': fare,
+        'service_code': serviceCode,
+      });
+      if (response.statusCode == 201 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return BookingItem.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /rides/book failed ($e). Using local fallback.');
+    }
+
+    return createBooking(
+      title: serviceCode == 'bike_taxi' ? 'Bike Taxi Ride' : 'City Car Ride',
+      subtitle: 'Driver Assigned • TVS Apache',
+      price: fare,
+      route: '$pickupAddress → $dropAddress',
+      seatNo: 'Driver: Ramesh K. (4.9★)',
+    );
+  }
+
+  Future<UserModel> updateUserProfile({
+    required String fullName,
+    required String phone,
+    required String email,
+    String? activeLocality,
+  }) async {
+    try {
+      final response = await _dio.put('/profile', data: {
+        'full_name': fullName,
+        'phone': phone,
+        'email': email,
+        'active_locality': activeLocality,
+      });
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return UserModel.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /profile PUT failed ($e).');
+    }
+
+    return UserModel(
+      id: 1,
+      phone: phone,
+      email: email,
+      fullName: fullName,
+      activeLocality: activeLocality ?? 'Indiranagar',
+      activeCity: 'Bengaluru',
+      walletBalance: 1450.00,
+    );
+  }
+
+  Future<double> topupWallet(double amount) async {
+    try {
+      final response = await _dio.post('/wallet/topup', data: {'amount': amount});
+      if (response.statusCode == 200 && response.data != null) {
+        return double.tryParse(response.data['wallet_balance']?.toString() ?? '1450') ?? 1450.0;
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /wallet/topup failed ($e).');
+    }
+    return 1450.0 + amount;
+  }
+
+  Future<UserPreferences> fetchPreferences() async {
+    try {
+      final response = await _dio.get('/preferences');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return UserPreferences.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /preferences GET failed ($e).');
+    }
+    return const UserPreferences();
+  }
+
+  Future<UserPreferences> updatePreferences({
+    bool? pushNotifications,
+    bool? promotionalAlerts,
+    bool? biometricLock,
+    String? language,
+  }) async {
+    try {
+      final response = await _dio.put('/preferences', data: {
+        'push_notifications': pushNotifications,
+        'promotional_alerts': promotionalAlerts,
+        'biometric_lock': biometricLock,
+        'language': language,
+      });
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        return UserPreferences.fromJson(data);
+      }
+    } catch (e) {
+      print('⚠️ API Client notice: Live /preferences PUT failed ($e).');
+    }
+    return UserPreferences(
+      pushNotifications: pushNotifications ?? true,
+      promotionalAlerts: promotionalAlerts ?? false,
+      biometricLock: biometricLock ?? true,
+      language: language ?? 'English (US)',
+    );
+  }
+
+  static final List<OrderItem> _defaultOrders = [
     OrderItem(
       id: 1,
       orderNumber: 'QF-071833',

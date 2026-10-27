@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:quikfly_core/quikfly_core.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/network/api_client.dart';
 
-class OrdersScreen extends StatefulWidget {
+class OrdersScreen extends ConsumerStatefulWidget {
   const OrdersScreen({super.key});
 
   @override
-  State<OrdersScreen> createState() => _OrdersScreenState();
+  ConsumerState<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   String _selectedFilter = 'Active';
   bool _isSearchOpen = false;
   final TextEditingController _searchController = TextEditingController();
@@ -23,162 +26,150 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final query = _searchController.text.trim().toLowerCase();
+    final ordersAsync = ref.watch(ordersProvider(null));
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-
-              // 1. Top Bar: Logo, Name, Notification Bell, User Avatar
-              _buildTopBar(context),
-
-              const SizedBox(height: 18),
-
-              // 2. Header Row: "Orders" + Search Action Button
-              _buildHeaderRow(),
-
-              // Animated Inline Search Bar (expands when search icon tapped)
-              if (_isSearchOpen) ...[
-                const SizedBox(height: 12),
-                _buildSearchField(),
-              ],
-
-              const SizedBox(height: 16),
-
-              // 3. Filter Pills: Active, Upcoming, Past
-              _buildFilterPills(),
-
-              const SizedBox(height: 18),
-
-              // 4. Active Order Card (Spice & Co.)
-              if ((_selectedFilter == 'Active' || _selectedFilter == 'All') &&
-                  (query.isEmpty ||
-                      'spice & co.'.contains(query) ||
-                      'food'.contains(query) ||
-                      'qf-071833'.contains(query) ||
-                      'preparing'.contains(query))) ...[
-                _buildActiveOrderCard(context),
-                const SizedBox(height: 24),
-              ],
-
-              // 5. Recent Orders Section
-              if (_selectedFilter != 'Upcoming') ...[
-                const Text(
-                  'Recent orders',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Item 1: Fresh Basket
-                if (query.isEmpty ||
-                    'fresh basket'.contains(query) ||
-                    'delivered'.contains(query) ||
-                    'grocery'.contains(query))
-                  _buildRecentOrderCard(
-                    title: 'Fresh Basket',
-                    subtitle: 'Delivered • 16 Jul',
-                    price: '₹782',
-                    status: 'Delivered',
-                    items: const [
-                      'Organic Farm Milk (1L)',
-                      'Country Eggs (Pack of 12)',
-                      'Fresh Spinach (500g)',
-                      'Kashmiri Apples (1kg)',
-                    ],
-                    onTap: () => _showOrderReceiptSheet(
-                      context,
-                      title: 'Fresh Basket',
-                      orderId: 'QF-068912',
-                      category: 'GROCERY',
-                      status: 'Delivered • 16 Jul',
-                      price: '₹782',
-                      items: const [
-                        'Organic Farm Milk (1L)',
-                        'Country Eggs (Pack of 12)',
-                        'Fresh Spinach (500g)',
-                        'Kashmiri Apples (1kg)',
-                      ],
-                    ),
-                  ),
-
-                if (query.isEmpty ||
-                    'nova audio'.contains(query) ||
-                    'shipped'.contains(query) ||
-                    'electronics'.contains(query)) ...[
-                  const SizedBox(height: 10),
-
-                  // Item 2: Nova Audio
-                  _buildRecentOrderCard(
-                    title: 'Nova Audio',
-                    subtitle: 'Shipped • 14 Jul',
-                    price: '₹2,849',
-                    status: 'Shipped',
-                    items: const [
-                      'Nova Wireless ANC Earbuds Pro',
-                      'Braided USB-C Fast Cable',
-                    ],
-                    onTap: () => _showOrderReceiptSheet(
-                      context,
-                      title: 'Nova Audio',
-                      orderId: 'QF-065401',
-                      category: 'ELECTRONICS',
-                      status: 'Shipped • 14 Jul',
-                      price: '₹2,849',
-                      items: const [
-                        'Nova Wireless ANC Earbuds Pro',
-                        'Braided USB-C Fast Cable',
-                      ],
-                    ),
-                  ),
-                ],
-              ] else ...[
-                // When Upcoming filter is selected
-                const Text(
-                  'Upcoming Deliveries',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildRecentOrderCard(
-                  title: 'Nova Audio',
-                  subtitle: 'In Transit • Expected Tomorrow, 2 PM',
-                  price: '₹2,849',
-                  status: 'Shipped',
-                  items: const [
-                    'Nova Wireless ANC Earbuds Pro',
-                    'Braided USB-C Fast Cable',
-                  ],
-                  onTap: () => _showOrderReceiptSheet(
-                    context,
-                    title: 'Nova Audio',
-                    orderId: 'QF-065401',
-                    category: 'ELECTRONICS',
-                    status: 'Shipped • Arriving Tomorrow',
-                    price: '₹2,849',
-                    items: const [
-                      'Nova Wireless ANC Earbuds Pro',
-                      'Braided USB-C Fast Cable',
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 32),
-            ],
+        child: ordersAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
           ),
+          error: (err, _) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textSecondary),
+                const SizedBox(height: 12),
+                Text('Could not load orders: $err', style: const TextStyle(color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () => ref.refresh(ordersProvider(null)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+          data: (allOrders) {
+            // Filter by search query
+            final filteredOrders = allOrders.where((o) {
+              if (query.isEmpty) return true;
+              return o.vendorName.toLowerCase().contains(query) ||
+                  o.orderNumber.toLowerCase().contains(query) ||
+                  o.category.toLowerCase().contains(query) ||
+                  o.status.toLowerCase().contains(query) ||
+                  o.itemsSummary.toLowerCase().contains(query);
+            }).toList();
+
+            final activeOrders = filteredOrders
+                .where((o) => o.status == 'PREPARING' || o.status == 'SHIPPED')
+                .toList();
+
+            final pastOrders = filteredOrders
+                .where((o) => o.status == 'DELIVERED' || o.status == 'CANCELLED')
+                .toList();
+
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                ref.invalidate(ordersProvider(null));
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // 1. Top Bar: Logo, Name, Notification Bell, User Avatar
+                    _buildTopBar(context),
+
+                    const SizedBox(height: 18),
+
+                    // 2. Header Row: "Orders" + Search Action Button
+                    _buildHeaderRow(),
+
+                    // Animated Inline Search Bar
+                    if (_isSearchOpen) ...[
+                      const SizedBox(height: 12),
+                      _buildSearchField(),
+                    ],
+
+                    const SizedBox(height: 16),
+
+                    // 3. Filter Pills: Active, Upcoming, Past
+                    _buildFilterPills(),
+
+                    const SizedBox(height: 18),
+
+                    // 4. Active Order Card
+                    if (_selectedFilter == 'Active' || _selectedFilter == 'All') ...[
+                      if (activeOrders.isNotEmpty)
+                        _buildActiveOrderCard(context, activeOrders.first)
+                      else if (_selectedFilter == 'Active')
+                        _buildEmptyActiveCard(context),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // 5. Recent Orders Section
+                    if (_selectedFilter != 'Upcoming') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _selectedFilter == 'Active' ? 'Recent orders' : 'Past orders',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          Text(
+                            '${pastOrders.length} orders',
+                            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (pastOrders.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'No past orders match your search',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        )
+                      else
+                        ...pastOrders.map((order) {
+                          final itemsList = order.itemsSummary
+                              .split(',')
+                              .map((s) => s.trim())
+                              .where((s) => s.isNotEmpty)
+                              .toList();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: _buildRecentOrderCard(
+                              order: order,
+                              items: itemsList,
+                              onTap: () => _showOrderReceiptSheet(context, order, itemsList),
+                            ),
+                          );
+                        }),
+                    ] else ...[
+                      // Upcoming Tab
+                      _buildUpcomingDeliveriesSection(context),
+                    ],
+
+                    const SizedBox(height: 36),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -223,7 +214,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               child: IconButton(
                 icon: const Icon(Icons.notifications_none_rounded, size: 22),
                 color: AppColors.textPrimary,
-                onPressed: () {},
+                onPressed: () => _showNotificationsDialog(context),
                 splashRadius: 20,
               ),
             ),
@@ -397,8 +388,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // --- 4. Active Order Card (Spice & Co.) ---
-  Widget _buildActiveOrderCard(BuildContext context) {
+  // --- 4. Active Order Card ---
+  Widget _buildActiveOrderCard(BuildContext context, OrderItem order) {
+    final isFood = order.category.toUpperCase() == 'FOOD';
+    final isGrocery = order.category.toUpperCase() == 'GROCERY';
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF071B2F),
@@ -415,21 +409,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Cutlery Icon + Category/ID + Title + "PREPARING" Badge
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // White icon container with orange cutlery
               Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.restaurant_rounded,
-                  color: Color(0xFFF95738),
+                child: Icon(
+                  isFood
+                      ? Icons.restaurant_rounded
+                      : (isGrocery ? Icons.shopping_basket_rounded : Icons.inventory_2_rounded),
+                  color: const Color(0xFFF95738),
                   size: 22,
                 ),
               ),
@@ -437,20 +431,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
-                      'FOOD • QF-071833',
-                      style: TextStyle(
+                      '${order.category} • ${order.orderNumber}',
+                      style: const TextStyle(
                         color: Color(0xFF38BDF8),
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                       ),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
-                      'Spice & Co.',
-                      style: TextStyle(
+                      order.vendorName,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16.5,
                         fontWeight: FontWeight.w800,
@@ -460,7 +454,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 ),
               ),
-              // "PREPARING" Status Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -471,9 +464,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     width: 0.8,
                   ),
                 ),
-                child: const Text(
-                  'PREPARING',
-                  style: TextStyle(
+                child: Text(
+                  order.status,
+                  style: const TextStyle(
                     color: Color(0xFF34D399),
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -486,35 +479,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           const SizedBox(height: 16),
 
-          // Thin Divider
-          Container(
-            height: 1,
-            color: Colors.white.withOpacity(0.08),
-          ),
+          Container(height: 1, color: Colors.white.withOpacity(0.08)),
 
           const SizedBox(height: 12),
 
-          // Details Row: Arrival Time & Total Price
           Row(
             children: [
-              const Icon(
-                Icons.access_time_rounded,
-                size: 15,
-                color: Color(0xFF94A3B8),
-              ),
+              const Icon(Icons.access_time_rounded, size: 15, color: Color(0xFF94A3B8)),
               const SizedBox(width: 6),
-              const Text(
-                'Arrives in 24-28 min',
-                style: TextStyle(
+              Text(
+                order.arrivalTimeLabel,
+                style: const TextStyle(
                   color: Color(0xFF94A3B8),
                   fontSize: 12.5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const Spacer(),
-              const Text(
-                '₹436',
-                style: TextStyle(
+              Text(
+                '₹${order.totalAmount.toStringAsFixed(0)}',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -525,11 +509,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
           const SizedBox(height: 10),
 
-          // Bottom Action Link: "View details ->"
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => _showActiveOrderDetailsSheet(context),
+              onTap: () => _showActiveOrderDetailsSheet(context, order),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
                 child: Row(
@@ -559,75 +542,179 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  Widget _buildEmptyActiveCard(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const Icon(Icons.fastfood_outlined, size: 36, color: AppColors.primary),
+          const SizedBox(height: 10),
+          const Text(
+            'No active orders right now',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Order delicious food or groceries from nearby stores',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final newOrder = await ref.read(apiClientProvider).createOrder(
+                vendorName: 'Spice & Co.',
+                category: 'FOOD',
+                totalAmount: 436.0,
+                itemsSummary: 'Butter Chicken Boneless, 2x Garlic Naan, Jeera Rice',
+              );
+              ref.invalidate(ordersProvider(null));
+              if (!mounted) return;
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  backgroundColor: const Color(0xFF071B2F),
+                  content: Text('Placed Order #${newOrder.orderNumber} with Spice & Co.!'),
+                ),
+              );
+            },
+            icon: const Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.white),
+            label: const Text('Order from Spice & Co. (₹436)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- 5. Recent Order Card ---
   Widget _buildRecentOrderCard({
-    required String title,
-    required String subtitle,
-    required String price,
-    required String status,
+    required OrderItem order,
     required List<String> items,
     required VoidCallback onTap,
   }) {
+    final isCancelled = order.status == 'CANCELLED';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.border),
           boxShadow: AppColors.cardShadow,
         ),
-        child: Row(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Package / Box Icon Container
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.inventory_2_outlined,
-                color: Color(0xFF64748B),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Title and Subtitle
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.vendorName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.arrivalTimeLabel} • ${order.orderDate}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
+                ),
+                Text(
+                  '₹${order.totalAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            Container(height: 1, color: AppColors.border),
+
+            const SizedBox(height: 12),
+
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: items.map((item) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    item,
                     style: const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF64748B),
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-            // Price
-            Text(
-              price,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Icon(
+                  isCancelled ? Icons.cancel_outlined : Icons.check_circle_rounded,
+                  size: 14,
+                  color: isCancelled ? const Color(0xFFEF4444) : AppColors.accentGreen,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  order.status,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isCancelled ? const Color(0xFFEF4444) : AppColors.accentGreen,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  'Receipt & reorder',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ],
             ),
           ],
         ),
@@ -635,183 +722,77 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // --- Modal Bottom Sheet: Active Order Live Tracker ---
-  void _showActiveOrderDetailsSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  // --- Upcoming Deliveries Section ---
+  Widget _buildUpcomingDeliveriesSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Upcoming Scheduled Deliveries',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Grab handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Title and Order ID
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Spice & Co.',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Order ID: QF-071833 • Food Delivery',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD1FADF),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'PREPARING',
-                      style: TextStyle(
-                        color: Color(0xFF027A48),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // Live Status Stepper
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildTrackingStep(
-                      title: 'Order Confirmed',
-                      time: '12:45 PM',
-                      isCompleted: true,
-                      isCurrent: false,
-                    ),
-                    _buildTrackingStep(
-                      title: 'Kitchen is Preparing your order',
-                      time: 'Estimated 15 mins',
-                      isCompleted: true,
-                      isCurrent: true,
-                    ),
-                    _buildTrackingStep(
-                      title: 'Valet Assigned & Heading to Store',
-                      time: 'Next step',
-                      isCompleted: false,
-                      isCurrent: false,
-                    ),
-                    _buildTrackingStep(
-                      title: 'Delivered at Indiranagar, Bengaluru',
-                      time: 'ETA 1:15 PM',
-                      isCompleted: false,
-                      isCurrent: false,
-                      isLast: true,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Order Items Breakdown
-              const Text(
-                'Items Ordered',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              _buildBillRow('1x Butter Chicken Boneless', '₹260'),
-              _buildBillRow('2x Garlic Naan', '₹96'),
-              _buildBillRow('1x Jeera Rice', '₹80'),
-              const Divider(height: 20, color: AppColors.border),
-              _buildBillRow('Delivery Fee & Taxes', 'Included'),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Total Paid', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  Text('₹436', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              // Action buttons: Track Live & Support
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.call_outlined, size: 18),
-                      label: const Text('Call Restaurant'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
+                    child: const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.navigation_outlined, size: 18, color: Colors.white),
-                      label: const Text('Track Delivery', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Weekly Farm Basket Subscription', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        Text('Delivery tomorrow between 7:00 AM - 9:00 AM', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                      ],
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(color: AppColors.border),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Indiranagar, Bengaluru', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  TextButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Subscription active. Slot confirmed for tomorrow.')),
+                      );
+                    },
+                    child: const Text('Manage Slot', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
             ],
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
-  // --- Modal Bottom Sheet: Past Order Receipt ---
-  void _showOrderReceiptSheet(
-    BuildContext context, {
-    required String title,
-    required String orderId,
-    required String category,
-    required String status,
-    required String price,
-    required List<String> items,
-  }) {
+  // --- Modal Bottom Sheet: Active Order Details ---
+  void _showActiveOrderDetailsSheet(BuildContext context, OrderItem order) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -846,12 +827,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        order.vendorName,
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$orderId • $category',
+                        'Order ID: ${order.orderNumber} • ${order.category}',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ],
@@ -859,13 +840,193 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
+                      color: const Color(0xFFD1FADF),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      status.split('•').first.trim().toUpperCase(),
+                      order.status,
                       style: const TextStyle(
-                        color: AppColors.textPrimary,
+                        color: Color(0xFF027A48),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Live Status Stepper
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    _buildTrackingStep(
+                      title: 'Order Confirmed',
+                      time: order.orderDate,
+                      isCompleted: true,
+                      isCurrent: false,
+                    ),
+                    _buildTrackingStep(
+                      title: 'Store is preparing your order',
+                      time: order.arrivalTimeLabel,
+                      isCompleted: true,
+                      isCurrent: true,
+                    ),
+                    _buildTrackingStep(
+                      title: 'Valet assigned & heading to store',
+                      time: 'Next step',
+                      isCompleted: false,
+                      isCurrent: false,
+                    ),
+                    _buildTrackingStep(
+                      title: 'Delivered at Indiranagar, Bengaluru',
+                      time: 'ETA 25 mins',
+                      isCompleted: false,
+                      isCurrent: false,
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              const Text(
+                'Items Ordered',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              ...order.itemsSummary.split(',').map((it) => _buildBillRow(it.trim(), '')),
+              const Divider(height: 20, color: AppColors.border),
+              _buildBillRow('Delivery Fee & Taxes', 'Included'),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Paid', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  Text('₹${order.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showCallDialog(context, order.vendorName, '+91 80 4920 1100');
+                      },
+                      icon: const Icon(Icons.call_outlined, size: 18),
+                      label: const Text('Call Store'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showLiveTrackingDialog(context, order);
+                      },
+                      icon: const Icon(Icons.navigation_outlined, size: 18, color: Colors.white),
+                      label: const Text('Track Live', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Cancel Order Button
+              Center(
+                child: TextButton(
+                  onPressed: () => _confirmCancelOrder(context, order),
+                  child: const Text('Cancel Order', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // --- Modal Bottom Sheet: Past Order Receipt ---
+  void _showOrderReceiptSheet(
+    BuildContext context,
+    OrderItem order,
+    List<String> items,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.vendorName,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.orderNumber} • ${order.category}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: order.status == 'CANCELLED' ? const Color(0xFFFEE2E2) : AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      order.status,
+                      style: TextStyle(
+                        color: order.status == 'CANCELLED' ? const Color(0xFFDC2626) : AppColors.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 11,
                       ),
@@ -903,7 +1064,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Total Amount', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  Text(price, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
+                  Text('₹${order.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.primary)),
                 ],
               ),
 
@@ -913,7 +1074,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Tax invoice #${order.orderNumber}.pdf downloaded to device.'),
+                            action: SnackBarAction(label: 'View', onPressed: () {}),
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.receipt_outlined, size: 18),
                       label: const Text('Download Invoice'),
                       style: OutlinedButton.styleFrom(
@@ -925,7 +1094,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        final newOrder = await ref.read(apiClientProvider).createOrder(
+                          vendorName: order.vendorName,
+                          category: order.category,
+                          totalAmount: order.totalAmount,
+                          itemsSummary: order.itemsSummary,
+                        );
+                        ref.invalidate(ordersProvider(null));
+                        setState(() => _selectedFilter = 'Active');
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: const Color(0xFF071B2F),
+                            content: Text('Reordered from ${order.vendorName}! Order #${newOrder.orderNumber} is now preparing.'),
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.repeat_rounded, size: 18, color: Colors.white),
                       label: const Text('Reorder', style: TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(
@@ -944,6 +1130,162 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  void _confirmCancelOrder(BuildContext context, OrderItem order) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Cancel Order?'),
+        content: Text('Are you sure you want to cancel order #${order.orderNumber} with ${order.vendorName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Order'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog
+              Navigator.pop(context); // Close sheet
+              await ref.read(apiClientProvider).cancelOrder(order.id);
+              ref.invalidate(ordersProvider(null));
+              if (!mounted) return;
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  backgroundColor: const Color(0xFFDC2626),
+                  content: Text('Order #${order.orderNumber} cancelled successfully.'),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            child: const Text('Yes, Cancel', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCallDialog(BuildContext context, String vendor, String phone) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(color: Color(0xFFD1FADF), shape: BoxShape.circle),
+              child: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF027A48), size: 36),
+            ),
+            const SizedBox(height: 16),
+            Text('Calling $vendor', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            const SizedBox(height: 4),
+            Text(phone, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+            const SizedBox(height: 16),
+            const Text('Connected • 00:04', style: TextStyle(color: Color(0xFF027A48), fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(ctx),
+              icon: const Icon(Icons.call_end_rounded, color: Colors.white),
+              label: const Text('End Call', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLiveTrackingDialog(BuildContext context, OrderItem order) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.navigation_rounded, color: AppColors.primary, size: 24),
+                const SizedBox(width: 8),
+                const Text('Live Delivery Tracking', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+                const Spacer(),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF071B2F),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.two_wheeler_rounded, color: Color(0xFF38BDF8), size: 36),
+                  SizedBox(height: 6),
+                  Text('Driver Ramesh K. is 1.4 km away', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('TVS Apache • KA-05-JK-1922', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Estimated arrival: ${order.arrivalTimeLabel}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text('Destination: 100ft Road, Indiranagar, Bengaluru', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                minimumSize: const Size.fromHeight(44),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Back to Orders', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNotificationsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Notifications'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            ListTile(
+              leading: Icon(Icons.local_offer_rounded, color: AppColors.primary),
+              title: Text('WELCOME50 Promo applied!'),
+              subtitle: Text('Flat 50% discount active on your food order.'),
+            ),
+            ListTile(
+              leading: Icon(Icons.check_circle_rounded, color: AppColors.accentGreen),
+              title: Text('Live MySQL sync connected'),
+              subtitle: Text('Orders and bookings persist in real-time.'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
   // --- Tracking Stepper Helper ---
   Widget _buildTrackingStep({
     required String title,
@@ -952,39 +1294,42 @@ class _OrdersScreenState extends State<OrdersScreen> {
     required bool isCurrent,
     bool isLast = false,
   }) {
-    final dotColor = isCurrent
-        ? AppColors.primary
-        : (isCompleted ? AppColors.accentGreen : AppColors.border);
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           children: [
             Container(
-              width: 14,
-              height: 14,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
-                color: dotColor,
                 shape: BoxShape.circle,
+                color: isCompleted
+                    ? (isCurrent ? AppColors.primary : AppColors.accentGreen)
+                    : Colors.white,
                 border: Border.all(
-                  color: isCurrent ? AppColors.primaryLight : Colors.white,
+                  color: isCompleted
+                      ? (isCurrent ? AppColors.primary : AppColors.accentGreen)
+                      : AppColors.border,
                   width: 2,
                 ),
               ),
+              child: isCompleted
+                  ? const Icon(Icons.check, size: 11, color: Colors.white)
+                  : null,
             ),
             if (!isLast)
               Container(
                 width: 2,
-                height: 28,
-                color: isCompleted ? AppColors.accentGreen.withOpacity(0.5) : AppColors.border,
+                height: 30,
+                color: isCompleted ? AppColors.accentGreen : AppColors.border,
               ),
           ],
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Padding(
-            padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+            padding: const EdgeInsets.only(top: 1.0, bottom: 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -992,13 +1337,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   title,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                    color: isCurrent ? AppColors.textPrimary : AppColors.textSecondary,
+                    fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                    color: isCurrent ? AppColors.primary : AppColors.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 1),
                 Text(
                   time,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -1008,15 +1354,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // --- Bill Row Helper ---
   Widget _buildBillRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          if (value.isNotEmpty)
+            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
         ],
       ),
     );

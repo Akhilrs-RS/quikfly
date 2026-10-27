@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(120) UNIQUE,
     full_name VARCHAR(100) NOT NULL,
     avatar_url VARCHAR(255),
+    wallet_balance DECIMAL(10, 2) DEFAULT 1450.00,
     role ENUM('customer', 'driver', 'admin') DEFAULT 'customer',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -168,4 +169,19 @@ INSERT INTO bookings (booking_code, user_id, title, subtitle, price, route, seat
 ('BK-89211', 1, 'Bus to Mysuru', '20 Jul • Confirmed', 1240.00, 'Indiranagar, BLR → Suburb Bus Stand, Mysuru', 'Seat 14A (Window)', 'CONFIRMED', '20 Jul'),
 ('BK-77402', 1, 'Tata Nexon rental', '12-14 Jul • Reserved', 4800.00, 'Self-Drive Pickup: Indiranagar Hub', 'Vehicle: Tata Nexon EV Max', 'RESERVED', '12 Jul')
 ON DUPLICATE KEY UPDATE price=VALUES(price), status=VALUES(status);
+
+-- 9. User Preferences Table
+CREATE TABLE IF NOT EXISTS user_preferences (
+    user_id BIGINT PRIMARY KEY,
+    push_notifications BOOLEAN DEFAULT TRUE,
+    promotional_alerts BOOLEAN DEFAULT FALSE,
+    biometric_lock BOOLEAN DEFAULT TRUE,
+    language VARCHAR(50) DEFAULT 'English (US)',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+INSERT INTO user_preferences (user_id, push_notifications, promotional_alerts, biometric_lock, language)
+VALUES (1, TRUE, FALSE, TRUE, 'English (US)')
+ON DUPLICATE KEY UPDATE language=VALUES(language);
+
 

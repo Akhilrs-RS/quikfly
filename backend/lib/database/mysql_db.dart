@@ -139,7 +139,12 @@ class DatabaseService {
   Future<UserModel> getUserProfile() async {
     if (_isConnected && _pool != null) {
       try {
-        final results = await _pool!.execute('SELECT * FROM users LIMIT 1;');
+        final results = await _pool!.execute(
+          'SELECT u.*, a.locality as active_locality, a.city as active_city '
+          'FROM users u '
+          'LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = TRUE '
+          'WHERE u.id = 1 LIMIT 1;',
+        );
         if (results.rows.isNotEmpty) {
           return UserModel.fromJson(results.rows.first.assoc());
         }
@@ -155,15 +160,16 @@ class DatabaseService {
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       activeLocality: 'Indiranagar',
       activeCity: 'Bengaluru',
+      walletBalance: 1450.00,
     );
   }
 
   Future<List<OrderItem>> getOrders({String? status}) async {
     if (_isConnected && _pool != null) {
       try {
-        final query = status != null
-            ? 'SELECT * FROM orders WHERE status = :status ORDER BY id ASC;'
-            : 'SELECT * FROM orders ORDER BY id ASC;';
+        final query = status != null && status.isNotEmpty && status.toLowerCase() != 'all'
+            ? 'SELECT * FROM orders WHERE status = :status ORDER BY id DESC;'
+            : 'SELECT * FROM orders ORDER BY id DESC;';
         final results = await _pool!.execute(query, {'status': status ?? ''});
         final list = <OrderItem>[];
         for (final row in results.rows) {
@@ -175,13 +181,115 @@ class DatabaseService {
       }
     }
 
-    return _mockOrders.where((o) => status == null || o.status.toLowerCase() == status.toLowerCase()).toList();
+    return _mockOrders.where((o) => status == null || status.toLowerCase() == 'all' || o.status.toLowerCase() == status.toLowerCase()).toList();
+  }
+
+  Future<OrderItem> createOrder({
+    required String vendorName,
+    required String category,
+    required double totalAmount,
+    required String itemsSummary,
+  }) async {
+    final orderNum = 'QF-${(DateTime.now().millisecondsSinceEpoch % 1000000).toString().padLeft(6, '0')}';
+    final now = DateTime.now();
+    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+    final period = now.hour >= 12 ? 'PM' : 'AM';
+    final minute = now.minute.toString().padLeft(2, '0');
+    final orderDate = 'Today, $hour:$minute $period';
+    const status = 'PREPARING';
+    const arrivalTimeLabel = 'Arrives in 22-26 min';
+
+    if (_isConnected && _pool != null) {
+      try {
+        final insertResult = await _pool!.execute(
+          'INSERT INTO orders (order_number, user_id, vendor_name, category, status, arrival_time_label, total_amount, items_summary, order_date) '
+          'VALUES (:order_number, 1, :vendor_name, :category, :status, :arrival_time_label, :total_amount, :items_summary, :order_date);',
+          {
+            'order_number': orderNum,
+            'vendor_name': vendorName,
+            'category': category.toUpperCase(),
+            'status': status,
+            'arrival_time_label': arrivalTimeLabel,
+            'total_amount': totalAmount,
+            'items_summary': itemsSummary,
+            'order_date': orderDate,
+          },
+        );
+        final newId = insertResult.lastInsertID.toInt();
+        return OrderItem(
+          id: newId,
+          orderNumber: orderNum,
+          vendorName: vendorName,
+          category: category.toUpperCase(),
+          status: status,
+          arrivalTimeLabel: arrivalTimeLabel,
+          totalAmount: totalAmount,
+          itemsSummary: itemsSummary,
+          orderDate: orderDate,
+        );
+      } catch (e) {
+        print('Error inserting order into MySQL: $e');
+      }
+    }
+
+    final newMock = OrderItem(
+      id: _mockOrders.length + 1,
+      orderNumber: orderNum,
+      vendorName: vendorName,
+      category: category.toUpperCase(),
+      status: status,
+      arrivalTimeLabel: arrivalTimeLabel,
+      totalAmount: totalAmount,
+      itemsSummary: itemsSummary,
+      orderDate: orderDate,
+    );
+    _mockOrders.insert(0, newMock);
+    return newMock;
+  }
+
+  Future<OrderItem?> cancelOrder(int orderId) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'UPDATE orders SET status = "CANCELLED", arrival_time_label = "Cancelled" WHERE id = :id;',
+          {'id': orderId},
+        );
+        final results = await _pool!.execute(
+          'SELECT * FROM orders WHERE id = :id;',
+          {'id': orderId},
+        );
+        if (results.rows.isNotEmpty) {
+          return OrderItem.fromJson(results.rows.first.assoc());
+        }
+      } catch (e) {
+        print('Error cancelling order in MySQL: $e');
+      }
+    }
+
+    final index = _mockOrders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      final old = _mockOrders[index];
+      final updated = OrderItem(
+        id: old.id,
+        orderNumber: old.orderNumber,
+        vendorName: old.vendorName,
+        category: old.category,
+        status: 'CANCELLED',
+        arrivalTimeLabel: 'Cancelled',
+        totalAmount: old.totalAmount,
+        itemsSummary: old.itemsSummary,
+        orderDate: old.orderDate,
+      );
+      _mockOrders[index] = updated;
+      return updated;
+    }
+    return null;
   }
 
   Future<List<BookingItem>> getBookings() async {
     if (_isConnected && _pool != null) {
       try {
-        final results = await _pool!.execute('SELECT * FROM bookings ORDER BY id ASC;');
+        final results = await _pool!.execute('SELECT * FROM bookings ORDER BY id DESC;');
         final list = <BookingItem>[];
         for (final row in results.rows) {
           list.add(BookingItem.fromJson(row.assoc()));
@@ -193,6 +301,231 @@ class DatabaseService {
     }
 
     return _mockBookings;
+  }
+
+  Future<BookingItem> createBooking({
+    required String title,
+    required String subtitle,
+    required double price,
+    String? route,
+    String? seatNo,
+  }) async {
+    final bookingCode = 'BK-${(DateTime.now().millisecondsSinceEpoch % 100000).toString().padLeft(5, '0')}';
+    const status = 'CONFIRMED';
+    const bookingDate = 'Today';
+
+    if (_isConnected && _pool != null) {
+      try {
+        final insertResult = await _pool!.execute(
+          'INSERT INTO bookings (booking_code, user_id, title, subtitle, price, route, seat_no, status, booking_date) '
+          'VALUES (:code, 1, :title, :subtitle, :price, :route, :seat_no, :status, :booking_date);',
+          {
+            'code': bookingCode,
+            'title': title,
+            'subtitle': subtitle,
+            'price': price,
+            'route': route ?? '',
+            'seat_no': seatNo ?? '',
+            'status': status,
+            'booking_date': bookingDate,
+          },
+        );
+        final newId = insertResult.lastInsertID.toInt();
+        return BookingItem(
+          id: newId,
+          bookingCode: bookingCode,
+          title: title,
+          subtitle: subtitle,
+          price: price,
+          route: route,
+          seatNo: seatNo,
+          status: status,
+          bookingDate: bookingDate,
+        );
+      } catch (e) {
+        print('Error inserting booking into MySQL: $e');
+      }
+    }
+
+    final newMock = BookingItem(
+      id: _mockBookings.length + 1,
+      bookingCode: bookingCode,
+      title: title,
+      subtitle: subtitle,
+      price: price,
+      route: route,
+      seatNo: seatNo,
+      status: status,
+      bookingDate: bookingDate,
+    );
+    _mockBookings.insert(0, newMock);
+    return newMock;
+  }
+
+  Future<BookingItem?> cancelBooking(int bookingId) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'UPDATE bookings SET status = "CANCELLED" WHERE id = :id;',
+          {'id': bookingId},
+        );
+        final results = await _pool!.execute(
+          'SELECT * FROM bookings WHERE id = :id;',
+          {'id': bookingId},
+        );
+        if (results.rows.isNotEmpty) {
+          return BookingItem.fromJson(results.rows.first.assoc());
+        }
+      } catch (e) {
+        print('Error cancelling booking in MySQL: $e');
+      }
+    }
+    return null;
+  }
+
+  Future<BookingItem> bookRide({
+    required String pickupAddress,
+    required String dropAddress,
+    required double fare,
+    String serviceCode = 'car_taxi',
+  }) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'INSERT INTO rides (user_id, service_code, pickup_lat, pickup_lng, pickup_address, drop_lat, drop_lng, drop_address, fare, status) '
+          'VALUES (1, :service_code, 12.9784, 77.6408, :pickup, 12.9716, 77.6412, :drop, :fare, "accepted");',
+          {
+            'service_code': serviceCode,
+            'pickup': pickupAddress,
+            'drop': dropAddress,
+            'fare': fare,
+          },
+        );
+      } catch (e) {
+        print('Error inserting ride into MySQL: $e');
+      }
+    }
+
+    return createBooking(
+      title: serviceCode == 'bike_taxi' ? 'Bike Taxi Ride' : 'City Car Ride',
+      subtitle: 'Driver Assigned • TVS Apache',
+      price: fare,
+      route: '$pickupAddress → $dropAddress',
+      seatNo: 'Driver: Ramesh K. (4.9★)',
+    );
+  }
+
+  Future<UserModel> updateUserProfile({
+    required String fullName,
+    required String phone,
+    required String email,
+    String? activeLocality,
+  }) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'UPDATE users SET full_name = :fullName, phone = :phone, email = :email WHERE id = 1;',
+          {
+            'fullName': fullName,
+            'phone': phone,
+            'email': email,
+          },
+        );
+        if (activeLocality != null && activeLocality.isNotEmpty) {
+          await _pool!.execute(
+            'UPDATE addresses SET locality = :locality, address_line = :address '
+            'WHERE user_id = 1 AND is_default = TRUE;',
+            {
+              'locality': activeLocality,
+              'address': '100ft Road, $activeLocality',
+            },
+          );
+        }
+        return getUserProfile();
+      } catch (e) {
+        print('Error updating user in MySQL: $e');
+      }
+    }
+
+    return UserModel(
+      id: 1,
+      phone: phone,
+      email: email,
+      fullName: fullName,
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      activeLocality: activeLocality ?? 'Indiranagar',
+      activeCity: 'Bengaluru',
+      walletBalance: 1450.00,
+    );
+  }
+
+  Future<double> topupWallet(double amount) async {
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'UPDATE users SET wallet_balance = wallet_balance + :amount WHERE id = 1;',
+          {'amount': amount},
+        );
+        final results = await _pool!.execute('SELECT wallet_balance FROM users WHERE id = 1;');
+        if (results.rows.isNotEmpty) {
+          final row = results.rows.first.assoc();
+          return double.tryParse(row['wallet_balance']?.toString() ?? '1450') ?? 1450.0;
+        }
+      } catch (e) {
+        print('Error topping up wallet in MySQL: $e');
+      }
+    }
+    return 1450.0 + amount;
+  }
+
+  Future<UserPreferences> getUserPreferences() async {
+    if (_isConnected && _pool != null) {
+      try {
+        final results = await _pool!.execute('SELECT * FROM user_preferences WHERE user_id = 1;');
+        if (results.rows.isNotEmpty) {
+          return UserPreferences.fromJson(results.rows.first.assoc());
+        }
+      } catch (e) {
+        print('Error querying preferences from MySQL: $e');
+      }
+    }
+    return const UserPreferences();
+  }
+
+  Future<UserPreferences> updateUserPreferences({
+    bool? pushNotifications,
+    bool? promotionalAlerts,
+    bool? biometricLock,
+    String? language,
+  }) async {
+    final current = await getUserPreferences();
+    final updated = current.copyWith(
+      pushNotifications: pushNotifications,
+      promotionalAlerts: promotionalAlerts,
+      biometricLock: biometricLock,
+      language: language,
+    );
+
+    if (_isConnected && _pool != null) {
+      try {
+        await _pool!.execute(
+          'INSERT INTO user_preferences (user_id, push_notifications, promotional_alerts, biometric_lock, language) '
+          'VALUES (1, :push, :promo, :bio, :lang) '
+          'ON DUPLICATE KEY UPDATE push_notifications = :push, promotional_alerts = :promo, biometric_lock = :bio, language = :lang;',
+          {
+            'push': updated.pushNotifications ? 1 : 0,
+            'promo': updated.promotionalAlerts ? 1 : 0,
+            'bio': updated.biometricLock ? 1 : 0,
+            'lang': updated.language,
+          },
+        );
+        return updated;
+      } catch (e) {
+        print('Error updating preferences in MySQL: $e');
+      }
+    }
+
+    return updated;
   }
 
   static final List<OrderItem> _mockOrders = [
