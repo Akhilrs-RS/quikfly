@@ -99,6 +99,70 @@ class CatalogController {
       }
     });
 
+    // GET /api/v1/orders
+    router.get('/orders', (Request request) async {
+      try {
+        final statusParam = request.url.queryParameters['status'];
+        final db = DatabaseService.instance;
+        final orders = await db.getOrders(status: statusParam);
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': orders.map((o) => o.toJson()).toList(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // GET /api/v1/bookings
+    router.get('/bookings', (Request request) async {
+      try {
+        final db = DatabaseService.instance;
+        final bookings = await db.getBookings();
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': bookings.map((b) => b.toJson()).toList(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
+    // GET /api/v1/profile
+    router.get('/profile', (Request request) async {
+      try {
+        final db = DatabaseService.instance;
+        final profile = await db.getUserProfile();
+        return Response.ok(
+          jsonEncode({
+            'status': 'success',
+            'data': profile.toJson(),
+            'source': db.isConnected ? 'mysql' : 'seed_fallback',
+          }),
+          headers: {'content-type': 'application/json'},
+        );
+      } catch (e) {
+        return Response.internalServerError(
+          body: jsonEncode({'status': 'error', 'message': e.toString()}),
+          headers: {'content-type': 'application/json'},
+        );
+      }
+    });
+
     return router;
   }
 }

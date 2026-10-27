@@ -18,26 +18,37 @@ class DatabaseService {
     final password = Platform.environment['MYSQL_PASSWORD'] ?? 'quikfly_password';
     final database = Platform.environment['MYSQL_DATABASE'] ?? 'quikfly_db';
 
-    try {
-      print('🔄 Connecting to MySQL at $host:$port (DB: $database, User: $user)...');
-      _pool = MySQLConnectionPool(
-        host: host,
-        port: port,
-        userName: user,
-        password: password,
-        databaseName: database,
-        maxConnections: 5,
-      );
+    int attempts = 0;
+    const maxAttempts = 6;
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        print('🔄 Connecting to MySQL at $host:$port (DB: $database, User: $user, attempt $attempts/$maxAttempts)...');
+        _pool = MySQLConnectionPool(
+          host: host,
+          port: port,
+          userName: user,
+          password: password,
+          databaseName: database,
+          maxConnections: 5,
+        );
 
-      // Test connection with a simple query
-      await _pool!.execute('SELECT 1;');
-      _isConnected = true;
-      print('✅ Successfully connected to MySQL database: $database');
-    } catch (e) {
-      _isConnected = false;
-      print('⚠️ Notice: Could not connect to live MySQL ($e).');
-      print('💡 Running in development fallback mode using high-fidelity Figma demo data.');
-      print('👉 Set MYSQL_USER & MYSQL_PASSWORD in environment or run docker compose to use live MySQL.');
+        // Test connection with a simple query
+        await _pool!.execute('SELECT 1;');
+        _isConnected = true;
+        print('✅ Successfully connected to MySQL database: $database');
+        return;
+      } catch (e) {
+        _isConnected = false;
+        if (attempts < maxAttempts) {
+          print('⏳ MySQL not ready yet ($e). Retrying in 2 seconds...');
+          await Future.delayed(const Duration(seconds: 2));
+        } else {
+          print('⚠️ Notice: Could not connect to live MySQL after $maxAttempts attempts ($e).');
+          print('💡 Running in development fallback mode using high-fidelity Figma demo data.');
+          print('👉 Set MYSQL_USER & MYSQL_PASSWORD in environment or run docker compose to use live MySQL.');
+        }
+      }
     }
   }
 
@@ -139,13 +150,111 @@ class DatabaseService {
 
     return const UserModel(
       id: 1,
-      phone: '+919876543210',
-      fullName: 'Akhil R S',
+      phone: '+919876548219',
+      fullName: 'Arjun Kumar',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       activeLocality: 'Indiranagar',
       activeCity: 'Bengaluru',
     );
   }
+
+  Future<List<OrderItem>> getOrders({String? status}) async {
+    if (_isConnected && _pool != null) {
+      try {
+        final query = status != null
+            ? 'SELECT * FROM orders WHERE status = :status ORDER BY id ASC;'
+            : 'SELECT * FROM orders ORDER BY id ASC;';
+        final results = await _pool!.execute(query, {'status': status ?? ''});
+        final list = <OrderItem>[];
+        for (final row in results.rows) {
+          list.add(OrderItem.fromJson(row.assoc()));
+        }
+        if (list.isNotEmpty) return list;
+      } catch (e) {
+        print('Error querying orders from MySQL: $e');
+      }
+    }
+
+    return _mockOrders.where((o) => status == null || o.status.toLowerCase() == status.toLowerCase()).toList();
+  }
+
+  Future<List<BookingItem>> getBookings() async {
+    if (_isConnected && _pool != null) {
+      try {
+        final results = await _pool!.execute('SELECT * FROM bookings ORDER BY id ASC;');
+        final list = <BookingItem>[];
+        for (final row in results.rows) {
+          list.add(BookingItem.fromJson(row.assoc()));
+        }
+        if (list.isNotEmpty) return list;
+      } catch (e) {
+        print('Error querying bookings from MySQL: $e');
+      }
+    }
+
+    return _mockBookings;
+  }
+
+  static final List<OrderItem> _mockOrders = [
+    const OrderItem(
+      id: 1,
+      orderNumber: 'QF-071833',
+      vendorName: 'Spice & Co.',
+      category: 'FOOD',
+      status: 'PREPARING',
+      arrivalTimeLabel: 'Arrives in 24-28 min',
+      totalAmount: 436.0,
+      itemsSummary: 'Butter Chicken Boneless, 2x Garlic Naan, Jeera Rice',
+      orderDate: '22 Oct',
+    ),
+    const OrderItem(
+      id: 2,
+      orderNumber: 'QF-068912',
+      vendorName: 'Fresh Basket',
+      category: 'GROCERY',
+      status: 'DELIVERED',
+      arrivalTimeLabel: 'Delivered • 16 Jul',
+      totalAmount: 782.0,
+      itemsSummary: 'Organic Farm Milk (1L), Country Eggs, Fresh Spinach, Kashmiri Apples',
+      orderDate: '16 Jul',
+    ),
+    const OrderItem(
+      id: 3,
+      orderNumber: 'QF-065401',
+      vendorName: 'Nova Audio',
+      category: 'ELECTRONICS',
+      status: 'SHIPPED',
+      arrivalTimeLabel: 'Shipped • 14 Jul',
+      totalAmount: 2849.0,
+      itemsSummary: 'Nova Wireless ANC Earbuds Pro, Braided USB-C Fast Cable',
+      orderDate: '14 Jul',
+    ),
+  ];
+
+  static final List<BookingItem> _mockBookings = [
+    const BookingItem(
+      id: 1,
+      bookingCode: 'BK-89211',
+      title: 'Bus to Mysuru',
+      subtitle: '20 Jul • Confirmed',
+      price: 1240.0,
+      route: 'Indiranagar, BLR → Suburb Bus Stand, Mysuru',
+      seatNo: 'Seat 14A (Window)',
+      status: 'CONFIRMED',
+      bookingDate: '20 Jul',
+    ),
+    const BookingItem(
+      id: 2,
+      bookingCode: 'BK-77402',
+      title: 'Tata Nexon rental',
+      subtitle: '12-14 Jul • Reserved',
+      price: 4800.0,
+      route: 'Self-Drive Pickup: Indiranagar Hub',
+      seatNo: 'Vehicle: Tata Nexon EV Max',
+      status: 'RESERVED',
+      bookingDate: '12 Jul',
+    ),
+  ];
 
   // Fallback Mock Data matching Figma Exactly
   static final List<ServiceItem> _mockServices = [

@@ -84,14 +84,46 @@ CREATE TABLE IF NOT EXISTS rides (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- 7. Orders (Food, Grocery, Marketplace)
+CREATE TABLE IF NOT EXISTS orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(50) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    vendor_name VARCHAR(150) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    status ENUM('PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED') NOT NULL DEFAULT 'PREPARING',
+    arrival_time_label VARCHAR(100),
+    total_amount DECIMAL(10, 2) NOT NULL,
+    items_summary TEXT NOT NULL,
+    order_date VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- 8. Bookings (Buses, Rentals, Flights)
+CREATE TABLE IF NOT EXISTS bookings (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    booking_code VARCHAR(50) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    subtitle VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    route VARCHAR(255),
+    seat_no VARCHAR(100),
+    status ENUM('CONFIRMED', 'RESERVED', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'CONFIRMED',
+    booking_date VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- ========================================================
 -- SEED DATA (Based on Figma QuikFly Design)
 -- ========================================================
 
--- Demo User
-INSERT INTO users (phone, email, full_name, avatar_url, role)
-VALUES ('+919876543210', 'akhil@quikfly.app', 'Akhil R S', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', 'customer')
-ON DUPLICATE KEY UPDATE full_name=VALUES(full_name);
+-- Demo User (Arjun Kumar)
+INSERT INTO users (id, phone, email, full_name, avatar_url, role)
+VALUES (1, '+919876548219', 'arjun.kumar@quikfly.app', 'Arjun Kumar', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', 'customer')
+ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), phone=VALUES(phone);
 
 -- Default Address for Indiranagar
 INSERT INTO addresses (user_id, label, address_line, city, locality, latitude, longitude, is_default)
@@ -123,3 +155,17 @@ INSERT INTO merchants (name, category, rating, delivery_time_min, image_url, lat
 ('Spice & Co.', 'North Indian & Biryani', 4.7, 25, 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400', 12.9716, 77.6412),
 ('Fresh Basket', 'Farm Fresh Groceries & Dairy', 4.9, 18, 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400', 12.9730, 77.6430),
 ('The Roastery', 'Artisanal Coffee & Bakery', 4.8, 20, 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=400', 12.9745, 77.6455);
+
+-- Orders Seed
+INSERT INTO orders (order_number, user_id, vendor_name, category, status, arrival_time_label, total_amount, items_summary, order_date) VALUES
+('QF-071833', 1, 'Spice & Co.', 'FOOD', 'PREPARING', 'Arrives in 24-28 min', 436.00, 'Butter Chicken Boneless, 2x Garlic Naan, Jeera Rice', '22 Oct'),
+('QF-068912', 1, 'Fresh Basket', 'GROCERY', 'DELIVERED', 'Delivered • 16 Jul', 782.00, 'Organic Farm Milk (1L), Country Eggs, Fresh Spinach, Kashmiri Apples', '16 Jul'),
+('QF-065401', 1, 'Nova Audio', 'ELECTRONICS', 'SHIPPED', 'Shipped • 14 Jul', 2849.00, 'Nova Wireless ANC Earbuds Pro, Braided USB-C Fast Cable', '14 Jul')
+ON DUPLICATE KEY UPDATE status=VALUES(status), total_amount=VALUES(total_amount);
+
+-- Bookings Seed
+INSERT INTO bookings (booking_code, user_id, title, subtitle, price, route, seat_no, status, booking_date) VALUES
+('BK-89211', 1, 'Bus to Mysuru', '20 Jul • Confirmed', 1240.00, 'Indiranagar, BLR → Suburb Bus Stand, Mysuru', 'Seat 14A (Window)', 'CONFIRMED', '20 Jul'),
+('BK-77402', 1, 'Tata Nexon rental', '12-14 Jul • Reserved', 4800.00, 'Self-Drive Pickup: Indiranagar Hub', 'Vehicle: Tata Nexon EV Max', 'RESERVED', '12 Jul')
+ON DUPLICATE KEY UPDATE price=VALUES(price), status=VALUES(status);
+

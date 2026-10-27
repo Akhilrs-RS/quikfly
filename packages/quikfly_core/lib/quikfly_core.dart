@@ -4,5 +4,7 @@ export 'models/service_item.dart';
 export 'models/banner_item.dart';
 export 'models/merchant_item.dart';
 export 'models/user_model.dart';
+export 'models/order_item.dart';
+export 'models/booking_item.dart';
 export 'dtos/home_feed_dto.dart';
 export 'dtos/explore_feed_dto.dart';

@@ -53,6 +53,9 @@ void main(List<String> args) async {
   print('📍 Health Check: http://localhost:${server.port}/health');
   print('🏠 Home Feed:    http://localhost:${server.port}/api/v1/home/feed');
   print('🔍 Explore Feed: http://localhost:${server.port}/api/v1/explore');
+  print('📦 Orders:       http://localhost:${server.port}/api/v1/orders');
+  print('🎫 Bookings:     http://localhost:${server.port}/api/v1/bookings');
+  print('👤 Profile:      http://localhost:${server.port}/api/v1/profile');
   print('====================================================');
 
   ProcessSignal.sigint.watch().listen((_) async {
