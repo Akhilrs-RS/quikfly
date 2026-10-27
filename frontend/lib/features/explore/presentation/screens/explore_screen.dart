@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../controllers/explore_controller.dart';
 
@@ -71,18 +72,21 @@ class ExploreScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppColors.darkCard,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.border, width: 2),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'AK',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      GestureDetector(
+                        onTap: () => context.go('/account'),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.darkCard,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.border, width: 2),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'AK',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
                         ),
                       ),
                     ],
@@ -279,6 +283,9 @@ class ExploreScreen extends ConsumerWidget {
                         image: DecorationImage(
                           image: _resolveExploreImage(feed.weekendInspiration?.imageUrl),
                           fit: BoxFit.cover,
+                          onError: (exception, stackTrace) {
+                            debugPrint('Explore banner image load error: $exception');
+                          },
                         ),
                         boxShadow: AppColors.elevatedShadow,
                       ),

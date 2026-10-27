@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -242,21 +243,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
         ),
         const SizedBox(width: 10),
         // User Avatar
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppColors.darkCard,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.border, width: 2),
-          ),
-          alignment: Alignment.center,
-          child: const Text(
-            'AK',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+        GestureDetector(
+          onTap: () => context.go('/account'),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.darkCard,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border, width: 2),
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'AK',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
             ),
           ),
         ),

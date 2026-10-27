@@ -44,6 +44,9 @@ class _PromoBannerCarouselState extends State<PromoBannerCarousel> {
                     image: DecorationImage(
                       image: _resolveBannerImage(index, banner.imageUrl),
                       fit: BoxFit.cover,
+                      onError: (exception, stackTrace) {
+                        debugPrint('Banner image load error: $exception');
+                      },
                     ),
                     boxShadow: AppColors.elevatedShadow,
                   ),
